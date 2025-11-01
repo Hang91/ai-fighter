@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 3218053993106403458}
   - component: {fileID: 7378047206059483276}
   - component: {fileID: 1110048823689181320}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Background
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -86,7 +86,7 @@ GameObject:
   - component: {fileID: 6809539627864927672}
   - component: {fileID: 8785435022339466966}
   - component: {fileID: 6578721060723851598}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: HPText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -222,7 +222,7 @@ GameObject:
   - component: {fileID: 7196184619576483331}
   - component: {fileID: 456242592418177168}
   - component: {fileID: 8715193622901801783}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Fill Area
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -297,7 +297,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6185359929896854032}
   - component: {fileID: 5602783859463518110}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: HealthSlider
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -387,7 +387,7 @@ GameObject:
   - component: {fileID: 1856296711633459826}
   - component: {fileID: 1897288332201510273}
   - component: {fileID: 1959455031458912294}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Fill
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -463,7 +463,7 @@ GameObject:
   - component: {fileID: 8873666594337554328}
   - component: {fileID: 14539100775839784}
   - component: {fileID: 7362406085446887345}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: HealthBarCanvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -569,8 +569,8 @@ GameObject:
   - component: {fileID: 4774377447031361202}
   - component: {fileID: 2415489869879972521}
   - component: {fileID: 7582846545422284810}
-  m_Layer: 0
-  m_Name: player1
+  m_Layer: 3
+  m_Name: Player
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -708,6 +708,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 671aadcb9b6d19ad9b4c43ee93ad779d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
+  teamID: 1
   maxHealth: 100
   damageColor: {r: 1, g: 0, b: 0, a: 1}
   damageFlashTime: 0.1
@@ -726,8 +727,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a2c37232b1f9266cb57aba11fa01f8c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AutoAttacker
-  attackDamage: 10
+  attackerType: 0
+  minAttackDamage: 8
+  maxAttackDamage: 12
   attackCooldown: 1
-  target: {fileID: 0}
-  moveSpeed: 3
   attackRange: 1
+  moveSpeed: 3
+  projectilePrefab: {fileID: 0}
+  areaDamageSpellPrefab: {fileID: 0}
+  mageCastRange: 8
+  firePoint: {fileID: 0}

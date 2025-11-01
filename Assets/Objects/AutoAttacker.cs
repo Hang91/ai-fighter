@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections;
 
 /// <summary>
+/// Handles Melee, Ranged, and Mage combat.
 /// Finds the closest enemy and moves to attack them.
 /// Will find a new target if the current one is null or dies.
 /// </summary>
@@ -9,17 +10,32 @@ using System.Collections;
 [RequireComponent(typeof(Rigidbody))]
 public class AutoAttacker : MonoBehaviour
 {
+    // Enum to define the attacker's type
+    public enum AttackerType { Melee, Ranged, Mage }
+
+    [Header("Unit Type")]
+    [SerializeField] private AttackerType attackerType = AttackerType.Melee;
+
     [Header("Combat Stats")]
-    // Updated from a single 'attackDamage' to a min/max range
     [SerializeField] private float minAttackDamage = 8f;
     [SerializeField] private float maxAttackDamage = 12f;
     [SerializeField] private float attackCooldown = 1.0f;
-    [SerializeField] private float attackRange = 1f;
+    [SerializeField] private float attackRange = 1f; // For melee and mage, this is engage range. For ranged, fire range.
     
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 3f;
 
-    private PlayerHealth target; // Target is now private and found automatically
+    [Header("Ranged Settings (If Ranged)")]
+    [SerializeField] private GameObject projectilePrefab; // The "bullet" to fire
+
+    [Header("Mage Settings (If Mage)")]
+    [SerializeField] private GameObject areaDamageSpellPrefab; // The AoE spell to cast
+    [SerializeField] private float mageCastRange = 8f; // Mages will stop at this distance to cast
+    
+    [Header("Common Settings")]
+    [SerializeField] private Transform firePoint; // Optional: Where projectiles/spells fire from
+
+    private PlayerHealth target;
     private PlayerHealth myHealth;
     private Rigidbody rb;
     private int myTeamID;
@@ -29,6 +45,16 @@ public class AutoAttacker : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         myHealth = GetComponent<PlayerHealth>();
+
+        // If no firePoint is assigned, just use the player's main transform
+        if (firePoint == null)
+        {
+            // Create an empty GameObject as a child if firePoint is not explicitly set in editor
+            GameObject fp = new GameObject("FirePoint");
+            fp.transform.SetParent(transform);
+            fp.transform.localPosition = Vector3.up * 1.5f; // Slightly above the player
+            firePoint = fp.transform;
+        }
     }
 
     void Start()
@@ -37,9 +63,6 @@ public class AutoAttacker : MonoBehaviour
         StartCoroutine(FightAndMoveLoop());
     }
 
-    /// <summary>
-    /// Finds the closest living enemy on the opposing team.
-    /// </summary>
     private void FindNewTarget()
     {
         PlayerHealth[] allPlayers = FindObjectsOfType<PlayerHealth>();
@@ -48,7 +71,6 @@ public class AutoAttacker : MonoBehaviour
 
         foreach (PlayerHealth player in allPlayers)
         {
-            // Skip if they are dead or on my team
             if (player.isDead || player.teamID == myTeamID)
             {
                 continue;
@@ -61,7 +83,6 @@ public class AutoAttacker : MonoBehaviour
                 closestEnemy = player;
             }
         }
-
         target = closestEnemy;
     }
 
@@ -69,46 +90,48 @@ public class AutoAttacker : MonoBehaviour
     {
         while (!myHealth.isDead)
         {
-            // If I don't have a target, or my target is dead, find a new one.
             if (target == null || target.isDead)
             {
                 FindNewTarget();
-
-                // If FindNewTarget() couldn't find anyone (all enemies dead), 
-                // just wait and check again next frame.
                 if (target == null)
                 {
-                    rb.velocity = Vector3.zero; // Stop moving
+                    rb.linearVelocity = Vector3.zero;
                     yield return null; 
                     continue; 
                 }
             }
 
-            // --- Movement Logic ---
+            // Determine the effective range based on unit type
+            float currentEngageRange = attackRange;
+            if (attackerType == AttackerType.Mage)
+            {
+                currentEngageRange = mageCastRange;
+            }
+
             float distanceToTarget = Vector3.Distance(transform.position, target.transform.position);
 
-            if (distanceToTarget > attackRange)
+            if (distanceToTarget > currentEngageRange)
             {
                 // Move towards target
                 Vector3 direction = (target.transform.position - transform.position).normalized;
-                rb.velocity = new Vector3(direction.x * moveSpeed, rb.velocity.y, direction.z * moveSpeed);
-                
-                // Look at the target
+                rb.linearVelocity = new Vector3(direction.x * moveSpeed, rb.linearVelocity.y, direction.z * moveSpeed);
                 transform.LookAt(target.transform.position);
             }
             else
             {
                 // Stop moving, we are in range
-                rb.velocity = Vector3.zero;
+                rb.linearVelocity = Vector3.zero;
+                // Only look at target if it's not a Mage (Mages cast on target's position, not necessarily looking at them perfectly)
+                // For a more "realistic" mage, you'd still want them to turn, but for now, simple is fine.
+                transform.LookAt(target.transform.position); 
 
-                // --- Attack Logic ---
                 if (Time.time > lastAttackTime + attackCooldown)
                 {
                     Attack();
                 }
             }
 
-            yield return null; // Wait for the next frame
+            yield return null;
         }
     }
 
@@ -117,12 +140,48 @@ public class AutoAttacker : MonoBehaviour
         if (target == null || target.isDead) return;
 
         lastAttackTime = Time.time;
-        
-        // --- DAMAGE IS NOW RANDOMIZED ---
         float randomDamage = Random.Range(minAttackDamage, maxAttackDamage);
 
-        Debug.Log(gameObject.name + " (Team " + myTeamID + ") attacks " + target.name + " for " + randomDamage.ToString("F1") + " damage.");
-        target.TakeDamage(randomDamage);
+        switch (attackerType)
+        {
+            case AttackerType.Melee:
+                Debug.Log(gameObject.name + " (Melee) attacks " + target.name + " for " + randomDamage.ToString("F1") + " damage.");
+                target.TakeDamage(randomDamage);
+                break;
+
+            case AttackerType.Ranged:
+                if (projectilePrefab == null)
+                {
+                    Debug.LogError("Ranged Attacker has no projectile prefab assigned!");
+                    return;
+                }
+                Debug.Log(gameObject.name + " (Ranged) fires at " + target.name);
+                GameObject projectileGO = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation);
+                Projectile projectile = projectileGO.GetComponent<Projectile>();
+                if (projectile != null)
+                {
+                    projectile.Seek(target, randomDamage);
+                }
+                break;
+
+            case AttackerType.Mage:
+                if (areaDamageSpellPrefab == null)
+                {
+                    Debug.LogError("Mage Attacker has no Area Damage Spell prefab assigned!");
+                    return;
+                }
+                Debug.Log(gameObject.name + " (Mage) casts spell at " + target.name + "'s location.");
+                
+                // Mage casts the spell at the *target's current position*
+                GameObject spellGO = Instantiate(areaDamageSpellPrefab, target.transform.position, Quaternion.identity);
+                AreaDamageSpell spell = spellGO.GetComponent<AreaDamageSpell>();
+                if (spell != null)
+                {
+                    // Pass damage, radius, and the *caster's team* to avoid friendly fire
+                    spell.SetupSpell(randomDamage, myTeamID);
+                }
+                break;
+        }
     }
 }
 
