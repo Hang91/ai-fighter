@@ -1,93 +1,128 @@
 using UnityEngine;
-using TMPro; // Required for the winner text
+using System.Collections;
 
 /// <summary>
-/// Manages the game state. Counts players on each team and subscribes
-/// to their death events to determine a winner.
+/// Finds the closest enemy and moves to attack them.
+/// Will find a new target if the current one is null or dies.
 /// </summary>
-public class GameManager : MonoBehaviour
+[RequireComponent(typeof(PlayerHealth))]
+[RequireComponent(typeof(Rigidbody))]
+public class AutoAttacker : MonoBehaviour
 {
-    [Header("UI")]
-    [SerializeField] private TextMeshProUGUI winnerText;
+    [Header("Combat Stats")]
+    // Updated from a single 'attackDamage' to a min/max range
+    [SerializeField] private float minAttackDamage = 8f;
+    [SerializeField] private float maxAttackDamage = 12f;
+    [SerializeField] private float attackCooldown = 1.0f;
+    [SerializeField] private float attackRange = 1f;
+    
+    [Header("Movement")]
+    [SerializeField] private float moveSpeed = 3f;
 
-    private int team1PlayerCount = 0;
-    private int team2PlayerCount = 0;
-    private bool gameIsOver = false;
+    private PlayerHealth target; // Target is now private and found automatically
+    private PlayerHealth myHealth;
+    private Rigidbody rb;
+    private int myTeamID;
+    private float lastAttackTime;
+
+    void Awake()
+    {
+        rb = GetComponent<Rigidbody>();
+        myHealth = GetComponent<PlayerHealth>();
+    }
 
     void Start()
     {
-        // Make sure winner text is hidden at the start
-        if(winnerText != null)
-        {
-            winnerText.gameObject.SetActive(false);
-        }
-
-        // Find all players in the scene
-        PlayerHealth[] allPlayers = FindObjectsOfType<PlayerHealth>();
-
-        foreach (PlayerHealth player in allPlayers)
-        {
-            // Count players for each team
-            if (player.teamID == 1)
-            {
-                team1PlayerCount++;
-            }
-            else if (player.teamID == 2)
-            {
-                team2PlayerCount++;
-            }
-
-            // Subscribe to this player's death event
-            player.OnPlayerDied += HandlePlayerDeath;
-        }
-
-        Debug.Log($"Game Start! Team 1: {team1PlayerCount} players. Team 2: {team2PlayerCount} players.");
+        myTeamID = myHealth.teamID;
+        StartCoroutine(FightAndMoveLoop());
     }
 
     /// <summary>
-    /// This method is called by the OnPlayerDied event from any PlayerHealth script.
+    /// Finds the closest living enemy on the opposing team.
     /// </summary>
-    /// <param name="teamID">The team of the player who just died.</param>
-    private void HandlePlayerDeath(int teamID)
+    private void FindNewTarget()
     {
-        if (gameIsOver) return; // Don't do anything if the game is already over
+        PlayerHealth[] allPlayers = FindObjectsOfType<PlayerHealth>();
+        PlayerHealth closestEnemy = null;
+        float minDistance = Mathf.Infinity;
 
-        // Decrement the correct team count
-        if (teamID == 1)
+        foreach (PlayerHealth player in allPlayers)
         {
-            team1PlayerCount--;
-            Debug.Log($"A player from Team 1 died. {team1PlayerCount} remaining.");
-        }
-        else if (teamID == 2)
-        {
-            team2PlayerCount--;
-            Debug.Log($"A player from Team 2 died. {team2PlayerCount} remaining.");
+            // Skip if they are dead or on my team
+            if (player.isDead || player.teamID == myTeamID)
+            {
+                continue;
+            }
+
+            float distance = Vector3.Distance(transform.position, player.transform.position);
+            if (distance < minDistance)
+            {
+                minDistance = distance;
+                closestEnemy = player;
+            }
         }
 
-        // Check for a winner
-        if (team1PlayerCount <= 0)
+        target = closestEnemy;
+    }
+
+    private IEnumerator FightAndMoveLoop()
+    {
+        while (!myHealth.isDead)
         {
-            EndGame("TEAM 2 WINS!");
-        }
-        else if (team2PlayerCount <= 0)
-        {
-            EndGame("TEAM 1 WINS!");
+            // If I don't have a target, or my target is dead, find a new one.
+            if (target == null || target.isDead)
+            {
+                FindNewTarget();
+
+                // If FindNewTarget() couldn't find anyone (all enemies dead), 
+                // just wait and check again next frame.
+                if (target == null)
+                {
+                    rb.velocity = Vector3.zero; // Stop moving
+                    yield return null; 
+                    continue; 
+                }
+            }
+
+            // --- Movement Logic ---
+            float distanceToTarget = Vector3.Distance(transform.position, target.transform.position);
+
+            if (distanceToTarget > attackRange)
+            {
+                // Move towards target
+                Vector3 direction = (target.transform.position - transform.position).normalized;
+                rb.velocity = new Vector3(direction.x * moveSpeed, rb.velocity.y, direction.z * moveSpeed);
+                
+                // Look at the target
+                transform.LookAt(target.transform.position);
+            }
+            else
+            {
+                // Stop moving, we are in range
+                rb.velocity = Vector3.zero;
+
+                // --- Attack Logic ---
+                if (Time.time > lastAttackTime + attackCooldown)
+                {
+                    Attack();
+                }
+            }
+
+            yield return null; // Wait for the next frame
         }
     }
 
-    private void EndGame(string winnerMessage)
+    private void Attack()
     {
-        gameIsOver = true;
-        Debug.Log("Game Over! " + winnerMessage);
+        if (target == null || target.isDead) return;
 
-        // Show the winner text on screen
-        if (winnerText != null)
-        {
-            winnerText.text = winnerMessage;
-            winnerText.gameObject.SetActive(true);
-        }
+        lastAttackTime = Time.time;
+        
+        // --- DAMAGE IS NOW RANDOMIZED ---
+        float randomDamage = Random.Range(minAttackDamage, maxAttackDamage);
 
-        // Optional: Stop the game
-        // Time.timeScale = 0f; // Uncomment this line to freeze the game
+        Debug.Log(gameObject.name + " (Team " + myTeamID + ") attacks " + target.name + " for " + randomDamage.ToString("F1") + " damage.");
+        target.TakeDamage(randomDamage);
     }
 }
+
