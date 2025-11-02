@@ -430,7 +430,7 @@ MonoBehaviour:
   minAttackDamage: 8
   maxAttackDamage: 12
   attackCooldown: 1
-  attackRange: 1
+  attackRange: 5
   moveSpeed: 3
   projectilePrefab: {fileID: 0}
   areaDamageSpellPrefab: {fileID: 9151369224206067445, guid: 41de14f7592267842a04efaf57123270,

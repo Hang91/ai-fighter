@@ -119,6 +119,18 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!223 &278348293 stripped
+Canvas:
+  m_CorrespondingSourceObject: {fileID: 8071993362094496625, guid: 5330b7fc118d7f84b8e0a3c3ba9b37b4,
+    type: 3}
+  m_PrefabInstance: {fileID: 4374427216342917086}
+  m_PrefabAsset: {fileID: 0}
+--- !u!223 &408483149 stripped
+Canvas:
+  m_CorrespondingSourceObject: {fileID: 8873666594337554328, guid: d87eb1c231eb19d8fa8a7ccf6205f80b,
+    type: 3}
+  m_PrefabInstance: {fileID: 797814409}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &506935102
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -301,6 +313,11 @@ PrefabInstance:
       propertyPath: m_AnchorMax.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2415489869879972521, guid: d87eb1c231eb19d8fa8a7ccf6205f80b,
+        type: 3}
+      propertyPath: healthBarCanvas
+      value: 
+      objectReference: {fileID: 408483149}
     - target: {fileID: 8208786257729488612, guid: d87eb1c231eb19d8fa8a7ccf6205f80b,
         type: 3}
       propertyPath: m_Name
@@ -531,7 +548,7 @@ PrefabInstance:
     - target: {fileID: 1263113116697670336, guid: d87eb1c231eb19d8fa8a7ccf6205f80b,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: -5
+      value: -7
       objectReference: {fileID: 0}
     - target: {fileID: 1263113116697670336, guid: d87eb1c231eb19d8fa8a7ccf6205f80b,
         type: 3}
@@ -1052,7 +1069,7 @@ PrefabInstance:
     - target: {fileID: 1968596572778112508, guid: 5330b7fc118d7f84b8e0a3c3ba9b37b4,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: -7.09
+      value: -5
       objectReference: {fileID: 0}
     - target: {fileID: 1968596572778112508, guid: 5330b7fc118d7f84b8e0a3c3ba9b37b4,
         type: 3}
@@ -1119,6 +1136,11 @@ PrefabInstance:
       propertyPath: teamID
       value: 2
       objectReference: {fileID: 0}
+    - target: {fileID: 3911566599781261314, guid: 5330b7fc118d7f84b8e0a3c3ba9b37b4,
+        type: 3}
+      propertyPath: healthBarCanvas
+      value: 
+      objectReference: {fileID: 278348293}
     - target: {fileID: 6049490620974878137, guid: 5330b7fc118d7f84b8e0a3c3ba9b37b4,
         type: 3}
       propertyPath: m_Name

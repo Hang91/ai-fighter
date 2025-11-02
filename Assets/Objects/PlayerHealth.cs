@@ -1,91 +1,83 @@
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro; // Using TextMeshPro
 using System.Collections;
-using UnityEngine.UI; // Required for UI elements like Slider
-using TMPro; // Required for TextMeshPro
 
-/// <summary>
-/// Manages player health, team, animations, and UI.
-/// Reports its death to the GameManager.
-/// </summary>
-[RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(Renderer))]
+[RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(Collider))] // Make sure there is a collider
 public class PlayerHealth : MonoBehaviour
 {
     [Header("Team")]
-    [SerializeField] public int teamID = 1; // Set this to 1 or 2 in the Inspector
+    public int teamID = 1;
 
-    [Header("Health Stats")]
+    [Header("Health")]
     [SerializeField] private float maxHealth = 100f;
-    private float currentHealth;
-    
-    public bool isDead { get; private set; } = false;
+    public float currentHealth { get; private set; }
+    public bool isDead { get; private set; }
 
-    // Event that passes the teamID of the player who died
-    public event System.Action<int> OnPlayerDied;
-
-    [Header("Animation")]
-    [SerializeField] private Color damageColor = Color.red;
-    [SerializeField] private float damageFlashTime = 0.1f;
-
-    [Header("UI (Health Bar)")]
-    [Tooltip("Drag the child Canvas GameObject here")]
-    [SerializeField] private GameObject healthBarCanvas; 
-    [Tooltip("Drag the Slider component from the child canvas")]
+    [Header("UI References")]
+    [SerializeField] private Canvas healthBarCanvas;
     [SerializeField] private Slider healthSlider;
-    [Tooltip("Drag the TextMeshProUGUI component from the child canvas")]
-    [SerializeField] private TextMeshProUGUI hpText;
-    
-    // Component References
-    private Renderer rend;
+    [SerializeField] private TextMeshProUGUI hpText; // Changed from Text to TextMeshProUGUI
+
+    [Header("Damage Effect")]
+    [SerializeField] private Color damageFlashColor = Color.red;
+    [SerializeField] private float damageFlashDuration = 0.15f;
+
+    private Renderer playerRenderer;
     private Rigidbody rb;
     private Color originalColor;
-    private Camera mainCamera; 
+    private Collider col; // Reference to the player's collider
+
+    // Event to announce death
+    public delegate void PlayerDied(int teamID);
+    public event PlayerDied OnPlayerDied;
 
     void Awake()
     {
+        playerRenderer = GetComponent<Renderer>();
         rb = GetComponent<Rigidbody>();
-        rend = GetComponent<Renderer>();
-        originalColor = rend.material.color;
-        mainCamera = Camera.main; 
-    }
-
-    void Start()
-    {
+        col = GetComponent<Collider>(); // Get the collider
+        originalColor = playerRenderer.material.color;
         currentHealth = maxHealth;
         isDead = false;
-        UpdateHealthBar();
-        if (healthBarCanvas != null)
-        {
-            healthBarCanvas.SetActive(true);
-        }
+
+        UpdateHealthUI();
     }
-    
-    void LateUpdate()
+
+    void Update()
     {
-        if (!isDead && healthBarCanvas != null && mainCamera != null)
+        // Keep the health bar facing the camera
+        // Only do this if we are alive
+        if (!isDead && healthBarCanvas != null && Camera.main != null)
         {
-            healthBarCanvas.transform.LookAt(transform.position + mainCamera.transform.forward);
+            healthBarCanvas.transform.LookAt(Camera.main.transform);
         }
     }
 
-    public void TakeDamage(float damageAmount)
+    public void TakeDamage(float amount)
     {
         if (isDead) return;
 
-        currentHealth -= damageAmount;
-        Debug.Log(gameObject.name + " (Team " + teamID + ") takes " + damageAmount + " damage.");
+        currentHealth -= amount;
+        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
+
+        UpdateHealthUI();
         
-        StartCoroutine(FlashDamageEffect());
-        UpdateHealthBar();
+        // Only flash if not dead
+        if (currentHealth > 0)
+        {
+            StartCoroutine(FlashDamageEffect());
+        }
 
         if (currentHealth <= 0)
         {
-            currentHealth = 0;
             Die();
         }
     }
 
-    private void UpdateHealthBar()
+    private void UpdateHealthUI()
     {
         if (healthSlider != null)
         {
@@ -93,36 +85,45 @@ public class PlayerHealth : MonoBehaviour
         }
         if (hpText != null)
         {
-            hpText.text = $"{currentHealth:0} / {maxHealth:0}";
+            hpText.text = $"{currentHealth:F0} / {maxHealth:F0}";
         }
     }
 
     private IEnumerator FlashDamageEffect()
     {
-        rend.material.color = damageColor;
-        yield return new WaitForSeconds(damageFlashTime);
-        rend.material.color = originalColor;
+        playerRenderer.material.color = damageFlashColor;
+        yield return new WaitForSeconds(damageFlashDuration);
+        playerRenderer.material.color = originalColor;
     }
 
     private void Die()
     {
+        if (isDead) return; // Prevent Die() from being called multiple times
         isDead = true;
-        Debug.Log(gameObject.name + " (Team " + teamID + ") has been defeated!");
 
-        // --- Report death to the GameManager ---
+        Debug.Log(gameObject.name + " has been defeated.");
+
+        // --- NEW DEATH: DISAPPEAR ---
+        
+        // 1. Disable all components that make the player "active"
+        if (col != null) col.enabled = false; // Stops blocking movement and attacks
+        if (playerRenderer != null) playerRenderer.enabled = false; // Becomes invisible
+        if (rb != null) rb.isKinematic = true; // Stops all physics calculations
+        if (healthBarCanvas != null) healthBarCanvas.gameObject.SetActive(false); // Hides UI
+        
+        // Disable this script to stop the Update() loop from running
+        this.enabled = false;
+
+        // Disable the attacker script so it stops its loops
+        AutoAttacker attacker = GetComponent<AutoAttacker>();
+        if(attacker != null) attacker.enabled = false;
+        
+        // 2. Announce death to GameManager
         OnPlayerDied?.Invoke(teamID);
 
-        if (healthBarCanvas != null)
-        {
-            healthBarCanvas.SetActive(false);
-        }
-
-        if (rb != null)
-        {
-            rb.constraints = RigidbodyConstraints.None;
-            rb.AddForce(Vector3.up * 2f - transform.forward * 1f, ForceMode.Impulse);
-            rb.AddTorque(transform.right * 10f, ForceMode.Impulse);
-        }
+        // 3. Destroy the object after a delay to ensure all scripts finish
+        Destroy(gameObject, 2f); 
+        // --- END NEW ---
     }
 }
 

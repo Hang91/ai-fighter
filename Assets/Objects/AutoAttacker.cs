@@ -20,13 +20,14 @@ public class AutoAttacker : MonoBehaviour
     [SerializeField] private float minAttackDamage = 8f;
     [SerializeField] private float maxAttackDamage = 12f;
     [SerializeField] private float attackCooldown = 1.0f;
-    [SerializeField] private float attackRange = 1f; // For melee and mage, this is engage range. For ranged, fire range.
+    [SerializeField] private float attackRange = 1f; // For melee, this is engage range.
     
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 3f;
 
     [Header("Ranged Settings (If Ranged)")]
     [SerializeField] private GameObject projectilePrefab; // The "bullet" to fire
+    // Ranged units will use 'attackRange' as their firing distance
 
     [Header("Mage Settings (If Mage)")]
     [SerializeField] private GameObject areaDamageSpellPrefab; // The AoE spell to cast
@@ -40,11 +41,20 @@ public class AutoAttacker : MonoBehaviour
     private Rigidbody rb;
     private int myTeamID;
     private float lastAttackTime;
+    private float freezePositionY = 0f;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
         myHealth = GetComponent<PlayerHealth>();
+
+        // --- NEW ---
+        // Constrain the player to a 2D plane (XZ) and prevent tipping over
+        // This keeps them from falling or flying, and stops them from tipping.
+        // Y is always 0.
+        rb.constraints = RigidbodyConstraints.FreezeRotationX | 
+                           RigidbodyConstraints.FreezeRotationZ;
+        // --- END NEW ---
 
         // If no firePoint is assigned, just use the player's main transform
         if (firePoint == null)
@@ -60,6 +70,18 @@ public class AutoAttacker : MonoBehaviour
     void Start()
     {
         myTeamID = myHealth.teamID;
+
+        // Ranged attackers should use their 'attackRange' as their primary range
+        // Mages have a separate 'mageCastRange'
+        if (attackerType == AttackerType.Ranged)
+        {
+            // We'll use attackRange for Ranged, no change needed here, just in the loop.
+        }
+        else if (attackerType == AttackerType.Mage)
+        {
+            // Use mageCastRange
+        }
+        
         StartCoroutine(FightAndMoveLoop());
     }
 
@@ -102,8 +124,12 @@ public class AutoAttacker : MonoBehaviour
             }
 
             // Determine the effective range based on unit type
-            float currentEngageRange = attackRange;
-            if (attackerType == AttackerType.Mage)
+            float currentEngageRange = attackRange; // Default for Melee
+            if (attackerType == AttackerType.Ranged)
+            {
+                currentEngageRange = attackRange; // Ranged uses attackRange
+            }
+            else if (attackerType == AttackerType.Mage)
             {
                 currentEngageRange = mageCastRange;
             }
@@ -114,15 +140,13 @@ public class AutoAttacker : MonoBehaviour
             {
                 // Move towards target
                 Vector3 direction = (target.transform.position - transform.position).normalized;
-                rb.linearVelocity = new Vector3(direction.x * moveSpeed, rb.linearVelocity.y, direction.z * moveSpeed);
+                rb.linearVelocity = new Vector3(direction.x * moveSpeed, 0, direction.z * moveSpeed); // Y velocity is 0
                 transform.LookAt(target.transform.position);
             }
             else
             {
                 // Stop moving, we are in range
                 rb.linearVelocity = Vector3.zero;
-                // Only look at target if it's not a Mage (Mages cast on target's position, not necessarily looking at them perfectly)
-                // For a more "realistic" mage, you'd still want them to turn, but for now, simple is fine.
                 transform.LookAt(target.transform.position); 
 
                 if (Time.time > lastAttackTime + attackCooldown)
@@ -177,7 +201,7 @@ public class AutoAttacker : MonoBehaviour
                 AreaDamageSpell spell = spellGO.GetComponent<AreaDamageSpell>();
                 if (spell != null)
                 {
-                    // Pass damage, radius, and the *caster's team* to avoid friendly fire
+                    // Pass damage and the *caster's team* to avoid friendly fire
                     spell.SetupSpell(randomDamage, myTeamID);
                 }
                 break;
